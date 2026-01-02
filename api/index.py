@@ -10,10 +10,6 @@ from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
-# ====== 🇮🇳 ==============
-# # © Developer = WOODcraft 
-# ========================
-# Configuration
 REQUEST_TIMEOUT = 30
 MAX_RETRIES = 3
 RETRY_DELAY = 2
@@ -41,21 +37,20 @@ TERABOX_URL_REGEX = r'^https:\/\/(www\.)?(terabox\.com|1024terabox\.com|teraboxa
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TESTED COOKIES (Updated 2024-06-23)
+# --- UPDATED COOKIES FROM YOUR NETSCAPE FILE ---
 COOKIES = {
-    'ndut_fmt': '082E0D57C65BDC31F6FF293F5D23164958B85D6952CCB6ED5D8A3870CB302BE7',
-    'ndus': 'Y-wWXKyteHuigAhC03Fr4bbee-QguZ4JC6UAdqap',
-    '__bid_n': '196ce76f980a5dfe624207',
-    '__stripe_mid': '148f0bd1-59b1-4d4d-8034-6275095fc06f99e0e6',
-    '__stripe_sid': '7b425795-b445-47da-b9db-5f12ec8c67bf085e26',
-    'browserid': 'veWFJBJ9hgVgY0eI9S7yzv66aE28f3als3qUXadSjEuICKF1WWBh4inG3KAWJsAYMkAFpH2FuNUum87q',
-    'csrfToken': 'wlv_WNcWCjBtbNQDrHSnut2h',
+    'browserid': '7L9GSxBXUOKecbY2YnFZ6i67KO0dKXhLojqHMMlh0CyPo5HrUWFlUOIrIHo=',
     'lang': 'en',
-    'PANWEB': '1',
-    'ab_sr': '1.0.1_NjA1ZWE3ODRiYjJiYjZkYjQzYjU4NmZkZGVmOWYxNDg4MjU3ZDZmMTg0Nzg4MWFlNzQzZDMxZWExNmNjYzliMGFlYjIyNWUzYzZiODQ1Nzg3NWM0MzIzNWNiYTlkYTRjZTc0ZTc5ODRkNzg4NDhiMTljOGRiY2I4MzY4ZmYyNTU5ZDE5NDczZmY4NjJhMDgyNjRkZDI2MGY5M2Q5YzIyMg=='
+    'TSID': 'e4A1gmUPsn7CSTCiiK3ZSFHRnMovzR5U',
+    'ndus': 'Y4Lkeg3teHuiJVmQpVB5HXAyFbQdkkGcMXwUXLoq',
+    '__stripe_mid': '83557fd5-cb1c-4fe7-88ff-74bcefd0b0f1ec9b05',
+    'csrfToken': 'bxb8SwVu1qTU53gXMuL5g8Lr',
+    '__stripe_sid': '2f091f92-8cec-4d2f-8c91-1acb6ae42ac23ef301',
+    'ndut_fmt': '0F5A22F2BF73A0F1F3755A30959EC50270DE5AADA33D85BB72C2535330D2D2EC',
+    'ndut_fmv': 'ccd259320ca7148a17f014fe6f5194873eb5209a82c37f4fb4b99e6a9904eede7acc8050a36e29a35eaae1030b732be478e0d72a9973d23d12f569c0af364592accaec1c3959e37350490900551c05ee80cb282d18a894cf03209c07202541d29f01281218e360e0a7535a6e61c9ac64'
 }
 
-# FIXED HEADERS AS REQUESTED
+# HEADERS
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -70,7 +65,7 @@ HEADERS = {
 }
 
 def get_headers():
-    """Return fixed headers as requested"""
+    """Return fixed headers"""
     return HEADERS
 
 def validate_terabox_url(url):
@@ -86,6 +81,10 @@ def make_request(url, method='GET', headers=None, params=None, allow_redirects=T
     retries = 0
     last_exception = None
     
+    # Use global cookies if none provided
+    if cookies is None:
+        cookies = COOKIES
+
     while retries < MAX_RETRIES:
         try:
             response = session.request(
@@ -134,13 +133,13 @@ def find_between(string, start, end):
 
 def extract_tokens(html):
     """Extract jsToken and log_id from HTML content"""
-    # Improved token extraction with regex as requested
+    # Regex to find the fn("...") call which contains the token
     token_match = re.search(r'fn\(["\'](.*?)["\']\)', html)
     if not token_match:
         token_match = re.search(r'fn%28%22(.*?)%22%29', html)
     
     if not token_match:
-        logger.error("Token extraction failed")
+        logger.error("Token extraction failed - possible HTML structure change")
         raise Exception("Could not extract jsToken")
     
     js_token = token_match.group(1)
@@ -241,12 +240,14 @@ def process_terabox_url(url):
     # Check if valid file list exists
     if 'list' not in response_data2 or not response_data2['list']:
         logger.error("No files found in API response")
-        raise Exception("No files found in shared link")
+        # Log response for debugging if needed
+        # logger.info(response_data2)
+        raise Exception("No files found in shared link (cookies might be invalid)")
     
     file_list = response_data2['list']
     logger.info(f"Found {len(file_list)} files")
     
-    # Step 6: Handle directories (folder handling as requested)
+    # Step 6: Handle directories
     if file_list and file_list[0].get('isdir') == "1":
         folder_params = params.copy()
         folder_params.update({
@@ -317,18 +318,6 @@ def process_terabox_url(url):
     
     return results
 
-def extract_thumbnail_dimensions(url: str) -> str:
-    """Extract thumbnail dimensions from URL"""
-    parsed = urlparse(url)
-    params = parse_qs(parsed.query)
-    size_param = params.get('size', [''])[0]
-    
-    if size_param:
-        parts = size_param.replace('c', '').split('_u')
-        if len(parts) == 2:
-            return f"{parts[0]}x{parts[1]}"
-    return "original"
-
 @app.route('/api', methods=['GET'])
 def api_handler():
     """API endpoint for processing Terabox URLs"""
@@ -366,28 +355,37 @@ def api_handler():
             "files": files,
             "processing_time": f"{time.time() - start_time:.2f}s",
             "file_count": len(files),
-            "cookies": "valid"
+            "cookies": "custom"
         })
     except Exception as e:
         logger.error(f"API error: {str(e)}")
         return jsonify({
             "status": "error",
             "message": f"Service error: {str(e)}",
-            "solution": "Try again later or contact support",
+            "solution": "Check your cookies (ndus/ndut_fmt) or try again later",
             "url": url,
             "developer": "@Farooq_is_king"
         }), 500
+
+@app.route('/config', methods=['GET'])
+def config_handler():
+    """Helper to check current configuration"""
+    return jsonify({
+        "current_user_agent": HEADERS['User-Agent'],
+        "cookie_ndus_prefix": COOKIES.get('ndus')[:5] + "..." if COOKIES.get('ndus') else "Not Set",
+        "note": "Use this User-Agent in IDM/ADM for big file downloads."
+    })
 
 @app.route('/')
 def home():
     """Home endpoint with service information"""
     return jsonify({
         "status": "API Running",
-        "developer": "@Farooq_is_king",
+        "developer": "@Aotpy / Tobi / Paras",
         "usage": "/api?url=TERABOX_SHARE_URL",
         "supported_domains": SUPPORTED_DOMAINS,
-        "cookie_status": "valid",
-        "note": "Service optimized for Terabox link processing"
+        "cookie_status": "loaded",
+        "note": "Premium/Custom cookies active"
     })
 
 if __name__ == '__main__':
